@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minimal GPT-4.1 Chat</title>
+  <style>
+    :root {
+      --black: #000;
+      --white: #fff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0 auto;
+      padding: 0;
+      max-width: 600px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: system-ui, sans-serif;
+      background: var(--white);
+      color: var(--black);
+    }
+    header {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--black);
+      display: flex;
+      gap: 0.5rem;
+    }
+    header input {
+      flex: 1;
+      border: 1px solid var(--black);
+      padding: 0.5rem;
+    }
+    header button {
+      border: 1px solid var(--black);
+      background: var(--black);
+      color: var(--white);
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .msg {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--black);
+      border-radius: 0.5rem;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .user {
+      align-self: flex-end;
+      background: var(--black);
+      color: var(--white);
+    }
+    .bot {
+      align-self: flex-start;
+      background: var(--white);
+      color: var(--black);
+    }
+    #inputBar {
+      display: flex;
+      border-top: 1px solid var(--black);
+    }
+    #inputBar input[type="text"] {
+      flex: 1;
+      border: none;
+      padding: 0.75rem;
+      outline: none;
+    }
+    #inputBar button {
+      border: none;
+      background: var(--black);
+      color: var(--white);
+      padding: 0 1.5rem;
+      cursor: pointer;
+    }
+    #inputBar button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <input id="keyInput" type="password" placeholder="API key (X-API-Key)" />
+    <button id="saveKey">Save</button>
+  </header>
+
+  <main id="messages"></main>
+
+  <div id="inputBar">
+    <input id="textInput" type="text" placeholder="Type a message…" />
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <script>
+    const ENDPOINT = "https://api-v1-fzehemc9g3a7bxc3.uksouth-01.azurewebsites.net/chat";
+
+    const messagesEl = document.getElementById("messages");
+    const textInput = document.getElementById("textInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const keyInput = document.getElementById("keyInput");
+    const saveKeyBtn = document.getElementById("saveKey");
+
+    // Persist API key in localStorage (never store sensitive keys in production!)
+    keyInput.value = localStorage.getItem("LOCAL_API_KEY") || "";
+
+    saveKeyBtn.onclick = () => {
+      localStorage.setItem("LOCAL_API_KEY", keyInput.value.trim());
+      keyInput.type = "password"; // hide
+      keyInput.blur();
+    };
+
+    function appendMsg(role, text) {
+      const div = document.createElement("div");
+      div.classList.add("msg", role === "user" ? "user" : "bot");
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const content = textInput.value.trim();
+      const apiKey = localStorage.getItem("LOCAL_API_KEY") || "";
+      if (!content || !apiKey) return;
+
+      appendMsg("user", content);
+      textInput.value = "";
+      sendBtn.disabled = true;
+
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": apiKey,
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "user", content }
+            ],
+          }),
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content ?? "(no content)";
+        appendMsg("bot", reply);
+      } catch (err) {
+        appendMsg("bot", `Error: ${err.message || err}`);
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    textInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+  </script>
+</body>
+</html>
